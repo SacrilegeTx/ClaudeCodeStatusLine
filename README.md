@@ -22,21 +22,29 @@ Usage percentages are color-coded: green (<50%) → yellow (≥50%) → orange (
 
 ## Requirements
 
+### macOS / Linux
+
 - `jq` — for JSON parsing
 - `curl` — for fetching usage data from the Anthropic API
+- Claude Code with OAuth authentication (Pro/Max subscription)
+
+### Windows
+
+- PowerShell 7+ (for ANSI escape support)
+- `git` in PATH (for branch/diff info)
 - Claude Code with OAuth authentication (Pro/Max subscription)
 
 ## Installation
 
 ### Quick setup (recommended)
 
-Copy the contents of `statusline.sh` and paste it into Claude Code with the prompt:
+Copy the contents of `statusline.sh` (or `statusline.ps1` on Windows) and paste it into Claude Code with the prompt:
 
 > Use this script as my status bar
 
 Claude Code will save the script and configure `settings.json` for you automatically.
 
-### Manual setup
+### Manual setup — macOS / Linux
 
 1. Copy the script to your Claude config directory:
 
@@ -52,6 +60,29 @@ Claude Code will save the script and configure `settings.json` for you automatic
      "statusLine": {
        "type": "command",
        "command": "~/.claude/statusline.sh"
+     }
+   }
+   ```
+
+3. Restart Claude Code.
+
+### Manual setup — Windows
+
+> **Windows users should use `statusline.ps1`** instead of the bash script.
+
+1. Copy the script to your Claude config directory:
+
+   ```powershell
+   Copy-Item statusline.ps1 "$env:USERPROFILE\.claude\statusline.ps1"
+   ```
+
+2. Add the status line config to `%USERPROFILE%\.claude\settings.json`:
+
+   ```json
+   {
+     "statusLine": {
+       "type": "command",
+       "command": "pwsh -NoProfile -File \"%USERPROFILE%\\.claude\\statusline.ps1\""
      }
    }
    ```
