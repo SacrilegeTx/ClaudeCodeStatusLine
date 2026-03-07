@@ -245,29 +245,34 @@ iso_to_epoch() {
 format_reset_time() {
     local iso_str="$1"
     local style="$2"
-    [ -z "$iso_str" ] || [ "$iso_str" = "null" ] && return
+    { [ -z "$iso_str" ] || [ "$iso_str" = "null" ]; } && return
 
     # Parse ISO datetime and convert to local time (cross-platform)
     local epoch
     epoch=$(iso_to_epoch "$iso_str")
     [ -z "$epoch" ] && return
 
-    # Format based on style (try BSD date first, then GNU date)
-    # BSD date uses %p (uppercase AM/PM), so convert to lowercase
+    # Format based on style
+    # Try GNU date first (Linux), then BSD date (macOS)
+    # Previous implementation piped BSD date through sed/tr, which always returned
+    # exit code 0 from the last pipe stage, preventing the GNU date fallback from
+    # ever executing on Linux.
+    local formatted=""
     case "$style" in
         time)
-            date -j -r "$epoch" +"%l:%M%p" 2>/dev/null | sed 's/^ //' | tr '[:upper:]' '[:lower:]' || \
-            date -d "@$epoch" +"%l:%M%P" 2>/dev/null | sed 's/^ //'
+            formatted=$(date -d "@$epoch" +"%H:%M" 2>/dev/null) || \
+            formatted=$(date -j -r "$epoch" +"%H:%M" 2>/dev/null)
             ;;
         datetime)
-            date -j -r "$epoch" +"%b %-d, %l:%M%p" 2>/dev/null | sed 's/  / /g; s/^ //' | tr '[:upper:]' '[:lower:]' || \
-            date -d "@$epoch" +"%b %-d, %l:%M%P" 2>/dev/null | sed 's/  / /g; s/^ //'
+            formatted=$(date -d "@$epoch" +"%b %-d, %H:%M" 2>/dev/null) || \
+            formatted=$(date -j -r "$epoch" +"%b %-d, %H:%M" 2>/dev/null)
             ;;
         *)
-            date -j -r "$epoch" +"%b %-d" 2>/dev/null | tr '[:upper:]' '[:lower:]' || \
-            date -d "@$epoch" +"%b %-d" 2>/dev/null
+            formatted=$(date -d "@$epoch" +"%b %-d" 2>/dev/null) || \
+            formatted=$(date -j -r "$epoch" +"%b %-d" 2>/dev/null)
             ;;
     esac
+    [ -n "$formatted" ] && echo "$formatted"
 }
 
 sep=" ${dim}|${reset} "
