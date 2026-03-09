@@ -8,16 +8,19 @@ if (-not $input) {
     exit 0
 }
 
+# ANSI escape - use [char]0x1b for PowerShell 5 compatibility ("`e" is PS7+ only)
+$esc = [char]0x1b
+
 # ANSI colors matching oh-my-posh theme
-$blue   = "`e[38;2;0;153;255m"
-$orange = "`e[38;2;255;176;85m"
-$green  = "`e[38;2;0;160;0m"
-$cyan   = "`e[38;2;46;149;153m"
-$red    = "`e[38;2;255;85;85m"
-$yellow = "`e[38;2;230;200;0m"
-$white  = "`e[38;2;220;220;220m"
-$dim    = "`e[2m"
-$reset  = "`e[0m"
+$blue   = "${esc}[38;2;0;153;255m"
+$orange = "${esc}[38;2;255;176;85m"
+$green  = "${esc}[38;2;0;160;0m"
+$cyan   = "${esc}[38;2;46;149;153m"
+$red    = "${esc}[38;2;255;85;85m"
+$yellow = "${esc}[38;2;230;200;0m"
+$white  = "${esc}[38;2;220;220;220m"
+$dim    = "${esc}[2m"
+$reset  = "${esc}[0m"
 
 # Format token counts (e.g., 50k / 200k)
 function Format-Tokens([long]$num) {
@@ -37,6 +40,11 @@ function Get-UsageColor([int]$pct) {
     elseif ($pct -ge 70) { return $orange }
     elseif ($pct -ge 50) { return $yellow }
     else { return $green }
+}
+
+# Null coalescing helper for PowerShell 5 compatibility (?? is PS7+ only)
+function Coalesce($value, $default) {
+    if ($null -ne $value) { return $value } else { return $default }
 }
 
 # ===== Extract data from JSON =====
@@ -221,7 +229,7 @@ if ($usageData) {
         $usage = if ($usageData -is [string]) { $usageData | ConvertFrom-Json } else { $usageData }
 
         # ---- 5-hour (current) ----
-        $fiveHourPct = [math]::Floor([double]($usage.five_hour.utilization ?? 0))
+        $fiveHourPct = [math]::Floor([double](Coalesce $usage.five_hour.utilization 0))
         $fiveHourResetIso = $usage.five_hour.resets_at
         $fiveHourReset = Format-ResetTime $fiveHourResetIso "time"
         $fiveHourColor = Get-UsageColor $fiveHourPct
@@ -230,7 +238,7 @@ if ($usageData) {
         if ($fiveHourReset) { $out += " ${dim}@${fiveHourReset}${reset}" }
 
         # ---- 7-day (weekly) ----
-        $sevenDayPct = [math]::Floor([double]($usage.seven_day.utilization ?? 0))
+        $sevenDayPct = [math]::Floor([double](Coalesce $usage.seven_day.utilization 0))
         $sevenDayResetIso = $usage.seven_day.resets_at
         $sevenDayReset = Format-ResetTime $sevenDayResetIso "datetime"
         $sevenDayColor = Get-UsageColor $sevenDayPct
@@ -241,7 +249,7 @@ if ($usageData) {
         # ---- Extra usage ----
         $extraEnabled = $usage.extra_usage.is_enabled
         if ($extraEnabled -eq $true) {
-            $extraPct = [math]::Floor([double]($usage.extra_usage.utilization ?? 0))
+            $extraPct = [math]::Floor([double](Coalesce $usage.extra_usage.utilization 0))
             $extraUsedRaw = $usage.extra_usage.used_credits
             $extraLimitRaw = $usage.extra_usage.monthly_limit
 
