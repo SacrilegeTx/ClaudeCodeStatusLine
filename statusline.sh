@@ -2,6 +2,7 @@
 # Single line: Model | tokens | %used | %remain | think | 5h bar @reset | 7d bar @reset | extra
 
 set -f  # disable globbing
+VERSION="1.1.0"
 
 input=$(cat)
 
@@ -47,6 +48,22 @@ usage_color() {
     elif [ "$pct" -ge 50 ]; then echo "$yellow"
     else echo "$green"
     fi
+}
+
+# Return 0 (true) if $1 > $2 using semantic versioning
+version_gt() {
+    local a="${1#v}" b="${2#v}"
+    local IFS='.'
+    read -r a1 a2 a3 <<< "$a"
+    read -r b1 b2 b3 <<< "$b"
+    a1=${a1:-0}; a2=${a2:-0}; a3=${a3:-0}
+    b1=${b1:-0}; b2=${b2:-0}; b3=${b3:-0}
+    [ "$a1" -gt "$b1" ] 2>/dev/null && return 0
+    [ "$a1" -lt "$b1" ] 2>/dev/null && return 1
+    [ "$a2" -gt "$b2" ] 2>/dev/null && return 0
+    [ "$a2" -lt "$b2" ] 2>/dev/null && return 1
+    [ "$a3" -gt "$b3" ] 2>/dev/null && return 0
+    return 1
 }
 
 # ===== Extract data from JSON =====
@@ -317,6 +334,43 @@ else
     # No valid usage data — show placeholders
     out+="${sep}${white}5h${reset} ${dim}-${reset}"
     out+="${sep}${white}7d${reset} ${dim}-${reset}"
+fi
+
+# ===== Update check (cached, 24h TTL) =====
+version_cache_file="/tmp/claude/statusline-version-cache.json"
+version_cache_max_age=86400  # 24 hours
+
+version_needs_refresh=true
+version_data=""
+
+if [ -f "$version_cache_file" ]; then
+    vc_mtime=$(stat -c %Y "$version_cache_file" 2>/dev/null || stat -f %m "$version_cache_file" 2>/dev/null)
+    vc_now=$(date +%s)
+    vc_age=$(( vc_now - vc_mtime ))
+    if [ "$vc_age" -lt "$version_cache_max_age" ]; then
+        version_needs_refresh=false
+    fi
+    version_data=$(cat "$version_cache_file" 2>/dev/null)
+fi
+
+if $version_needs_refresh; then
+    touch "$version_cache_file" 2>/dev/null
+    vc_response=$(curl -s --max-time 5 \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/daniel3303/ClaudeCodeStatusLine/releases/latest" 2>/dev/null)
+    if [ -n "$vc_response" ] && echo "$vc_response" | jq -e '.tag_name' >/dev/null 2>&1; then
+        version_data="$vc_response"
+        echo "$vc_response" > "$version_cache_file"
+    fi
+fi
+
+if [ -n "$version_data" ]; then
+    latest_tag=$(echo "$version_data" | jq -r '.tag_name // empty')
+    if [ -n "$latest_tag" ] && version_gt "$latest_tag" "$VERSION"; then
+        release_url=$(echo "$version_data" | jq -r '.html_url // empty')
+        [ -z "$release_url" ] && release_url="https://github.com/daniel3303/ClaudeCodeStatusLine/releases/latest"
+        out+="${sep}${dim}\033]8;;${release_url}\007update: ${latest_tag}\033]8;;\007${reset}"
+    fi
 fi
 
 # Output single line

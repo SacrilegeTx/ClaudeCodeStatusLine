@@ -17,6 +17,7 @@ A custom status line for [Claude Code](https://claude.com/claude-code) that disp
 | **5h** | 5-hour rate limit usage percentage and reset time |
 | **7d** | 7-day rate limit usage percentage and reset time |
 | **Extra** | Extra usage credits spent / limit (if enabled) |
+| **Update** | Clickable link when a new version is available (checked every 24h) |
 
 Usage percentages are color-coded: green (<50%) → yellow (≥50%) → orange (≥70%) → red (≥90%).
 
@@ -105,6 +106,10 @@ Claude Code will save the script and configure `settings.json` for you automatic
 ## Caching
 
 Usage data from the Anthropic API is cached for 60 seconds at `/tmp/claude/statusline-usage-cache.json` to avoid excessive API calls.
+
+## Update Notifications
+
+The status line checks GitHub for new releases once every 24 hours. When a newer version is available, a dim clickable `update: vX.Y.Z` link appears at the end of the status line, opening the release page in your browser. The check is cached at `/tmp/claude/statusline-version-cache.json` (or `%TEMP%\claude\...` on Windows) and fails silently if the API is unreachable or no release has been published.
 
 ## License
 

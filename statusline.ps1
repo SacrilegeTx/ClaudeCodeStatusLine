@@ -1,3 +1,4 @@
+$VERSION = "1.1.0"
 # Single line: Model | tokens | %used | %remain | think | 5h bar @reset | 7d bar @reset | extra
 
 # Read input from stdin
@@ -45,6 +46,17 @@ function Get-UsageColor([int]$pct) {
 # Null coalescing helper for PowerShell 5 compatibility (?? is PS7+ only)
 function Coalesce($value, $default) {
     if ($null -ne $value) { return $value } else { return $default }
+}
+
+# Return $true if $a > $b using semantic versioning
+function Test-VersionGreaterThan([string]$a, [string]$b) {
+    try {
+        $va = [version]($a -replace '^v', '')
+        $vb = [version]($b -replace '^v', '')
+        return $va -gt $vb
+    } catch {
+        return $false
+    }
 }
 
 # ===== Extract data from JSON =====
@@ -264,6 +276,48 @@ if ($usageData) {
             } else {
                 $out += "${sep}${white}extra${reset} ${green}enabled${reset}"
             }
+        }
+    } catch {}
+}
+
+# ===== Update check (cached, 24h TTL) =====
+$versionCacheFile = Join-Path $cacheDir "statusline-version-cache.json"
+$versionCacheMaxAge = 86400  # 24 hours
+
+$versionNeedsRefresh = $true
+$versionData = $null
+
+if (Test-Path $versionCacheFile) {
+    $vcMtime = (Get-Item $versionCacheFile).LastWriteTime
+    $vcAge = ((Get-Date) - $vcMtime).TotalSeconds
+    if ($vcAge -lt $versionCacheMaxAge) {
+        $versionNeedsRefresh = $false
+    }
+    $versionData = Get-Content $versionCacheFile -Raw
+}
+
+if ($versionNeedsRefresh) {
+    # Touch cache immediately (thundering herd protection)
+    if (Test-Path $versionCacheFile) {
+        (Get-Item $versionCacheFile).LastWriteTime = Get-Date
+    } else {
+        New-Item -ItemType File -Path $versionCacheFile -Force | Out-Null
+    }
+    try {
+        $vcResponse = Invoke-RestMethod -Uri "https://api.github.com/repos/daniel3303/ClaudeCodeStatusLine/releases/latest" `
+            -Headers @{ "Accept" = "application/vnd.github+json" } -Method Get -TimeoutSec 5 -ErrorAction Stop
+        $versionData = $vcResponse | ConvertTo-Json -Depth 10
+        $versionData | Set-Content $versionCacheFile -Force
+    } catch {}
+}
+
+if ($versionData) {
+    try {
+        $vcParsed = if ($versionData -is [string]) { $versionData | ConvertFrom-Json } else { $versionData }
+        $latestTag = $vcParsed.tag_name
+        if ($latestTag -and (Test-VersionGreaterThan $latestTag $VERSION)) {
+            $releaseUrl = if ($vcParsed.html_url) { $vcParsed.html_url } else { "https://github.com/daniel3303/ClaudeCodeStatusLine/releases/latest" }
+            $out += "${sep}${dim}${esc}]8;;${releaseUrl}${esc}\update: ${latestTag}${esc}]8;;${esc}\${reset}"
         }
     } catch {}
 }
