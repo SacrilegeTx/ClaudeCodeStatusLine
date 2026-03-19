@@ -1,3 +1,4 @@
+$VERSION = "1.1.0"
 # Single line: Model | tokens | %used | %remain | think | 5h bar @reset | 7d bar @reset | extra
 
 # Read input from stdin
@@ -45,6 +46,17 @@ function Get-UsageColor([int]$pct) {
 # Null coalescing helper for PowerShell 5 compatibility (?? is PS7+ only)
 function Coalesce($value, $default) {
     if ($null -ne $value) { return $value } else { return $default }
+}
+
+# Return $true if $a > $b using semantic versioning
+function Test-VersionGreaterThan([string]$a, [string]$b) {
+    try {
+        $va = [version]($a -replace '^v', '')
+        $vb = [version]($b -replace '^v', '')
+        return $va -gt $vb
+    } catch {
+        return $false
+    }
 }
 
 # ===== Extract data from JSON =====
@@ -130,9 +142,10 @@ $out += "${orange}${usedTokens}/${totalTokens}${reset} ${dim}(${reset}${green}${
 $out += " ${dim}|${reset} "
 $out += "effort: "
 switch ($effortLevel) {
-    "low"    { $out += "${dim}low${reset}" }
+    "low"    { $out += "${dim}${effortLevel}${reset}" }
     "medium" { $out += "${orange}med${reset}" }
-    default  { $out += "${green}high${reset}" }
+    "max"    { $out += "${red}${effortLevel}${reset}" }
+    default  { $out += "${green}${effortLevel}${reset}" }
 }
 
 # ===== OAuth token resolution =====
@@ -268,7 +281,49 @@ if ($usageData) {
     } catch {}
 }
 
-# Output single line
-Write-Host -NoNewline $out
+# ===== Update check (cached, 24h TTL) =====
+$versionCacheFile = Join-Path $cacheDir "statusline-version-cache.json"
+$versionCacheMaxAge = 86400  # 24 hours
+
+$versionNeedsRefresh = $true
+$versionData = $null
+
+if (Test-Path $versionCacheFile) {
+    $vcMtime = (Get-Item $versionCacheFile).LastWriteTime
+    $vcAge = ((Get-Date) - $vcMtime).TotalSeconds
+    if ($vcAge -lt $versionCacheMaxAge) {
+        $versionNeedsRefresh = $false
+    }
+    $versionData = Get-Content $versionCacheFile -Raw
+}
+
+if ($versionNeedsRefresh) {
+    # Touch cache immediately (thundering herd protection)
+    if (Test-Path $versionCacheFile) {
+        (Get-Item $versionCacheFile).LastWriteTime = Get-Date
+    } else {
+        New-Item -ItemType File -Path $versionCacheFile -Force | Out-Null
+    }
+    try {
+        $vcResponse = Invoke-RestMethod -Uri "https://api.github.com/repos/daniel3303/ClaudeCodeStatusLine/releases/latest" `
+            -Headers @{ "Accept" = "application/vnd.github+json" } -Method Get -TimeoutSec 5 -ErrorAction Stop
+        $versionData = $vcResponse | ConvertTo-Json -Depth 10
+        $versionData | Set-Content $versionCacheFile -Force
+    } catch {}
+}
+
+$updateLine = ""
+if ($versionData) {
+    try {
+        $vcParsed = if ($versionData -is [string]) { $versionData | ConvertFrom-Json } else { $versionData }
+        $latestTag = $vcParsed.tag_name
+        if ($latestTag -and (Test-VersionGreaterThan $latestTag $VERSION)) {
+            $updateLine = "`n${dim}Update available: ${latestTag} → https://github.com/daniel3303/ClaudeCodeStatusLine${reset}"
+        }
+    } catch {}
+}
+
+# Output
+Write-Host -NoNewline "$out$updateLine"
 
 exit 0
