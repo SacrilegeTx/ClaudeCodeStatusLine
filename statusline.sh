@@ -468,6 +468,11 @@ if $version_needs_refresh; then
     if [ -n "$vc_response" ] && echo "$vc_response" | jq -e '.tag_name' >/dev/null 2>&1; then
         version_data="$vc_response"
         echo "$vc_response" > "$version_cache_file"
+    elif [ ! -s "$version_cache_file" ]; then
+        # Fetch failed and the cache has no usable content — drop the empty
+        # stampede lock so the next render retries instead of the fresh mtime
+        # suppressing update checks for the full 24h TTL.
+        rm -f "$version_cache_file" 2>/dev/null
     fi
 fi
 

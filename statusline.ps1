@@ -441,7 +441,14 @@ if ($versionNeedsRefresh) {
             -Headers @{ "Accept" = "application/vnd.github+json" } -Method Get -TimeoutSec 5 -ErrorAction Stop
         $versionData = $vcResponse | ConvertTo-Json -Depth 10
         $versionData | Set-Content $versionCacheFile -Force
-    } catch {}
+    } catch {
+        # Fetch failed — if the cache has no usable content, drop the empty
+        # stampede lock so the next render retries instead of the fresh mtime
+        # suppressing update checks for the full 24h TTL.
+        if ((Test-Path $versionCacheFile) -and (Get-Item $versionCacheFile).Length -eq 0) {
+            Remove-Item $versionCacheFile -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 $updateLine = ""
