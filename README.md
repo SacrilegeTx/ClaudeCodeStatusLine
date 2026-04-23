@@ -47,18 +47,10 @@ git -C ~/.claude/statusline pull
 
 No `settings.json` changes are needed — the path stays valid across versions.
 
-### Alternative: paste-install (no git required)
-
-If you can't clone (corporate-locked machine, no git, etc.), copy the contents of `statusline.sh` (macOS / Linux) or `statusline.ps1` (Windows) and paste it into Claude Code with:
-
-> Use this script as my status bar.
-
-Claude will save it under `~/.claude/` and wire up `settings.json`. Updating this way requires re-pasting the script on each release.
-
 ## Requirements
 
 - Claude Code with OAuth authentication (Pro/Max subscription for rate-limit and extra-usage data)
-- `git` in `PATH` (for the recommended install)
+- `git` in `PATH`
 - macOS / Linux: `jq` and `curl`
 - Windows: PowerShell 5.1+ (default on Windows 10/11)
 
