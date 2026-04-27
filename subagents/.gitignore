@@ -1,0 +1,4 @@
+/subagents
+/dist/
+*.test
+*.out

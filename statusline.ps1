@@ -462,7 +462,37 @@ if ($versionData) {
     } catch {}
 }
 
+# ===== Subagent monitor (optional companion Go binary) =====
+# If a `subagents` (or `subagents.exe`) binary lives next to this script,
+# render its rows below the main line. Reads the same stdin JSON to scope
+# by session_id.
+$subagentsBin = $null
+$subagentsDir = Join-Path $PSScriptRoot "subagents"
+foreach ($candidate in @("subagents.exe", "subagents")) {
+    $path = Join-Path $subagentsDir $candidate
+    if (Test-Path $path -PathType Leaf) {
+        $subagentsBin = $path
+        break
+    }
+}
+
+$subOut = ""
+if ($subagentsBin) {
+    # Force UTF-8 so the Braille spinner and ellipsis render on PowerShell 5.1
+    try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+    try {
+        $rendered = $input | & $subagentsBin render 2>$null
+        if ($rendered) {
+            $subOut = ($rendered -join "`n").TrimEnd()
+        }
+    } catch {}
+}
+
 # Output
-Write-Host -NoNewline "$out$updateLine"
+if ($subOut) {
+    Write-Host -NoNewline "$out$updateLine`n$subOut"
+} else {
+    Write-Host -NoNewline "$out$updateLine"
+}
 
 exit 0

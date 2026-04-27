@@ -21,6 +21,49 @@ A custom status line for [Claude Code](https://claude.com/claude-code) that disp
 
 Usage percentages are color-coded: green (<50%) → yellow (≥50%) → orange (≥70%) → red (≥90%).
 
+## Subagent Monitor (optional)
+
+When enabled, additional rows render below the main status line tracking Claude Code's running and recently-finished `Task` subagents — particularly useful for SDD orchestrator workflows where multiple agents run in parallel.
+
+```
+Opus 4.7 1M | statusline@main | 110k/1m (11%) | effort: high
+⠋ sdd-design · running · 2s
+✓ sdd-apply · done · 5s
+✗ sdd-verify · failed · 12s
+```
+
+| Visual | Meaning |
+|--------|---------|
+| Braille spinner (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`) | Subagent is running |
+| `✓` | Finished successfully (visible 10s after completion) |
+| `✗` | Failed (visible 10s after completion) |
+| Yellow / orange duration | Running >30s (yellow) or >2m (orange) — flags stuck agents |
+| `…` ellipsis | Subagent type name truncated at 24 chars |
+
+### SDD phase colors
+
+Each SDD phase has its own muted 256-color shade so the orchestrator's current step is identifiable at a glance:
+
+| Phase | Color |
+|-------|-------|
+| `sdd-explore` | steel blue |
+| `sdd-propose` | muted plum |
+| `sdd-spec` | muted teal |
+| `sdd-design` | slate |
+| `sdd-tasks` | tan |
+| `sdd-apply` | sage |
+| `sdd-verify` | salmon |
+| `sdd-archive` | mauve gray |
+| `sdd-init` | muted cyan |
+| `sdd-onboard` | rose |
+| Other (`Explore`, `general-purpose`, `vercel:*`, …) | dim gray |
+
+### How it works
+
+A small Go binary in `subagents/` is invoked by the status line on each render. It tracks subagent lifecycle through Claude Code's `PreToolUse:Task` and `PostToolUse:Task` hooks, persisting state under `~/.claude/state/subagents.json` with file-based locking so multiple Claude Code instances stay isolated by `session_id`.
+
+To enable, build the binary (`cd subagents && go build .`) and add the hooks shown in [INSTALL.md](INSTALL.md). Setting `refreshInterval: 300` on `statusLine` is recommended so the spinner actually animates.
+
 ## Installation
 
 Ask Claude Code:

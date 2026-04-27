@@ -484,7 +484,21 @@ if [ -n "$version_data" ]; then
     fi
 fi
 
+# ===== Subagent monitor (optional companion Go binary) =====
+# If a `subagents` binary lives next to this script, render its rows below the
+# main line. Reads the same stdin JSON to scope by session_id.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+subagents_bin="$script_dir/subagents/subagents"
+sub_out=""
+if [ -x "$subagents_bin" ]; then
+    sub_out=$(printf '%s' "$input" | "$subagents_bin" render 2>/dev/null)
+fi
+
 # Output
-printf "%b" "$out$update_line"
+if [ -n "$sub_out" ]; then
+    printf "%b\n%s" "$out$update_line" "$sub_out"
+else
+    printf "%b" "$out$update_line"
+fi
 
 exit 0
